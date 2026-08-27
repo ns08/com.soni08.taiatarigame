@@ -41,7 +41,8 @@ jobs:
                      -archivePath $PWD/build/taiatarigame.xcarchive \
                      archive \
                      -allowProvisioningUpdates \
-                     CODE_SIGN_STYLE="Automatic"
+                     CODE_SIGN_STYLE="Automatic" \
+                     DEVELOPMENT_TEAM="JACG2JJ596"
 
       - name: Export IPA
         run: |
