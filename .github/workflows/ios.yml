@@ -1,4 +1,4 @@
-name: iOS CI/CD
+name: iOS CI/CD - Taiatari Game
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
     runs-on: macos-latest
     defaults:
       run:
-        working-directory: ./src # PWABuilderのファイルが入っているディレクトリパス
+        working-directory: ./src # ← ここを /src に変更
 
     steps:
       - name: Checkout Repository
@@ -34,11 +34,11 @@ jobs:
 
       - name: Build and Archive
         run: |
-          xcodebuild -workspace *.xcworkspace \
-                     -scheme App \
+          xcodebuild -workspace taiatarigame.xcworkspace \
+                     -scheme taiatarigame \
                      -sdk iphoneos \
                      -configuration Release \
-                     -archivePath $PWD/build/App.xcarchive \
+                     -archivePath $PWD/build/taiatarigame.xcarchive \
                      archive \
                      -allowProvisioningUpdates \
                      CODE_SIGN_STYLE="Automatic"
@@ -46,14 +46,14 @@ jobs:
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
-                     -archivePath $PWD/build/App.xcarchive \
+                     -archivePath $PWD/build/taiatarigame.xcarchive \
                      -exportPath $PWD/build/output \
                      -exportOptionsPlist ExportOptions.plist
 
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v1
         with:
-          app-path: ios/build/output/App.ipa
+          app-path: src/build/output/taiatarigame.ipa # パスの先頭を src に合わせる
           issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
