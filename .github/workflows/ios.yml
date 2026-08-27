@@ -51,6 +51,31 @@ jobs:
           p12-password: ${{ secrets.P12_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      - name: Dump installed identities and provisioning info
+        run: |
+          echo "=== Installed code signing identities ==="
+          security find-identity -p codesigning -v || true
+          echo "=== Dump provisioning profile to plist ==="
+          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision > /tmp/profile.plist || true
+          echo "Profile plist head:"
+          /usr/libexec/PlistBuddy -c "Print" /tmp/profile.plist | head -n 80 || true
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist 2>/dev/null || echo "")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist 2>/dev/null || echo "")
+          echo "PROFILE_NAME=${PROFILE_NAME}"
+          echo "PROFILE_UUID=${PROFILE_UUID}"
+          echo "PROFILE_NAME=${PROFILE_NAME}" >> $GITHUB_ENV
+          echo "PROFILE_UUID=${PROFILE_UUID}" >> $GITHUB_ENV
+
+      - name: Determine CODE_SIGN_IDENTITY
+        run: |
+          # Prefer an Apple Distribution identity; fall back to first identity if none matched
+          CID=$(security find-identity -p codesigning -v | awk -F\" '/Apple Distribution/ {print $2; exit}')
+          if [ -z "$CID" ]; then
+            CID=$(security find-identity -p codesigning -v | awk -F\" '{print $2; exit}')
+          fi
+          echo "Detected CODE_SIGN_IDENTITY: $CID"
+          echo "CODE_SIGN_IDENTITY=$CID" >> $GITHUB_ENV
+
       - name: Debug workspace contents
         run: |
           cd src
@@ -67,8 +92,9 @@ jobs:
 
       - name: Build and Archive (signed with provisioning profile)
         run: |
-          cd src
           set -o pipefail
+          cd src
+          echo "Using PROFILE_NAME=${{ env.PROFILE_NAME }} PROFILE_UUID=${{ env.PROFILE_UUID }} CODE_SIGN_IDENTITY=${{ env.CODE_SIGN_IDENTITY }}"
           xcodebuild -workspace taiatarigame.xcworkspace \
             -scheme taiatarigame \
             -sdk iphoneos \
@@ -78,8 +104,9 @@ jobs:
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            PROVISIONING_PROFILE_SPECIFIER="appstore_profile" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}" \
+            PROVISIONING_PROFILE_SPECIFIER="${{ env.PROFILE_NAME }}" \
+            CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
             2>&1 | tee xcodebuild.log
         continue-on-error: true
 
