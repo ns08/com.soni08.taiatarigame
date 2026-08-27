@@ -1,40 +1,40 @@
-name: iOS CI/CD - Taiatari Game
+name: iOS Build and Deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: ./src
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Use Default Xcode
-        run: |
-          sudo xcode-select -s /Applications/Xcode.app
-          xcodebuild -version
+        run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Install CocoaPods
         run: |
-          pod install
+          if [ -f "src/Podfile" ]; then
+            cd src
+            pod install
+          fi
 
       - name: Setup App Store Connect API Key
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+        uses: apple-actions/import-app-store-connect-api-key@v1
+        with:
+          key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          key-content: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
 
       - name: Create Archive Directory
         run: mkdir -p build
 
       - name: Build and Archive
         run: |
+          cd src
           xcodebuild -workspace taiatarigame.xcworkspace \
                      -scheme taiatarigame \
                      -sdk iphoneos \
@@ -43,22 +43,4 @@ jobs:
                      archive \
                      -allowProvisioningUpdates \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="JACG2JJ596" \
-                     -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-                     -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
-
-      - name: Export IPA
-        run: |
-          xcodebuild -exportArchive \
-                     -archivePath $PWD/build/taiatarigame.xcarchive \
-                     -exportPath $PWD/build/output \
-                     -exportOptionsPlist ExportOptions.plist
-
-      - name: Upload to TestFlight
-        uses: apple-actions/upload-testflight-build@v1
-        with:
-          app-path: src/build/output/taiatarigame.ipa
-          issuer-id: ${{ secrets.ASC_ISSUER_ID }}
-          api-key-id: ${{ secrets.ASC_KEY_ID }}
-          api-private-key: ${{ secrets.ASC_PRIVATE_KEY }}
+                     DEVELOPMENT_TEAM="JACG2JJ596"
