@@ -40,7 +40,6 @@ jobs:
       - name: Build and Archive
         run: |
           cd src
-          # スキームを確実に共有状態にしてビルドエラーを防ぐ
           mkdir -p taiatarigame.xcodeproj/xcshareddata/xcschemes/
           
           xcodebuild -workspace taiatarigame.xcworkspace \
@@ -48,11 +47,11 @@ jobs:
             -sdk iphoneos \
             -configuration Release \
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
-            clean archive \
+            archive \
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Automatic" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
-            
