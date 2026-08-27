@@ -28,6 +28,7 @@ jobs:
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
       - name: Create Archive Directory
         run: mkdir -p build
@@ -43,10 +44,9 @@ jobs:
                      -allowProvisioningUpdates \
                      CODE_SIGN_STYLE="Automatic" \
                      DEVELOPMENT_TEAM="JACG2JJ596" \
-                     -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" \
-                     -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}" \
-                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8"
-                     
+                     -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+                     -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
 
       - name: Export IPA
         run: |
