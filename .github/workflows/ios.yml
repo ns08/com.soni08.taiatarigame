@@ -22,12 +22,10 @@ jobs:
             pod install
           fi
 
-      - name: Setup App Store Connect API Key
-        uses: apple-actions/import-app-store-connect-api-key@v1
-        with:
-          key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-          key-content: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+      - name: Setup App Store Connect API Key File
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
 
       - name: Create Archive Directory
         run: mkdir -p build
@@ -43,4 +41,7 @@ jobs:
                      archive \
                      -allowProvisioningUpdates \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="JACG2JJ596"
+                     DEVELOPMENT_TEAM="JACG2JJ596" \
+                     -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" \
+                     -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}" \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8"
