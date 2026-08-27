@@ -25,7 +25,10 @@ jobs:
       - name: Install CocoaPods
         run: |
           cd src
-          if [ -f "Podfile" ]; then
+          if [ -f "Gemfile" ]; then
+            bundle install
+            bundle exec pod install
+          elif [ -f "Podfile" ]; then
             pod install
           fi
 
@@ -49,3 +52,4 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+            
