@@ -9,15 +9,15 @@ jobs:
     runs-on: macos-latest
     defaults:
       run:
-        working-directory: ./src # ← ここを /src に変更
+        working-directory: ./src
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Xcode Version
+      - name: Use Default Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app
+          sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
       - name: Install CocoaPods
@@ -53,7 +53,7 @@ jobs:
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v1
         with:
-          app-path: src/build/output/taiatarigame.ipa # パスの先頭を src に合わせる
+          app-path: src/build/output/taiatarigame.ipa
           issuer-id: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
