@@ -13,6 +13,7 @@
     <key>uploadSymbols</key>
     <true/>
     <key>provisioningProfiles</key>
+    <key>provisioningProfiles</key>
     <dict>
         <key>jp.soni08.taiatarigame</key>
         <string>JACG2JJ596.jp.soni08.taiatarigame</string>
