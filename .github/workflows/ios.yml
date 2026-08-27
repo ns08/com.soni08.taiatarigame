@@ -37,19 +37,38 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
+          echo "Installed provisioning profile:"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles || true
+
       - name: Import signing assets
         uses: Apple-Actions/import-codesign-certs@v2
         with:
-          p12-file-base64: ${{ secrets.P12_BASE64 }}  # Changed from p12-base64
+          p12-file-base64: ${{ secrets.P12_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      - name: Build and Archive
+      - name: Debug workspace contents
         run: |
           cd src
-          # スキームディレクトリを確実に作成して共有エラーを防ぐ
-          mkdir -p taiatarigame.xcodeproj/xcshareddata/xcschemes/
-          
+          pwd
+          echo "== ls -la src =="
+          ls -la
+          echo "== ls -la workspace/project =="
+          ls -la taiatarigame.xcworkspace || true
+          ls -la taiatarigame.xcodeproj/xcshareddata/xcschemes || true
+          echo "== xcodebuild -version =="
+          xcodebuild -version
+          echo "== xcodebuild -list =="
+          xcodebuild -list -workspace taiatarigame.xcworkspace || true
+
+      - name: Build and Archive (signed with provisioning profile)
+        run: |
+          cd src
+          set -o pipefail
           xcodebuild -workspace taiatarigame.xcworkspace \
             -scheme taiatarigame \
             -sdk iphoneos \
@@ -57,8 +76,15 @@ jobs:
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE="Automatic" \
+            CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+            PROVISIONING_PROFILE_SPECIFIER="appstore_profile" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            2>&1 | tee xcodebuild.log
+        continue-on-error: true
+
+      - name: Upload xcodebuild log
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: src/xcodebuild.log
