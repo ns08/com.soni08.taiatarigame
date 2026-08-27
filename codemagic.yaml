@@ -2,15 +2,11 @@ workflows:
   ios-pwa-workflow:
     name: iOS PWA Build and Archive
     max_build_duration: 60
-    instance: mac_mini_m2
     environment:
       vars:
         BUNDLE_ID: "jp.soni08.taiatarigame"
         XCODE_WORKSPACE: "taiatarigame.xcworkspace"
         XCODE_SCHEME: "taiatarigame"
-      # App Store Connect API を Codemagic UI で設定する場合のグループ名（必要に応じて変更）
-      # app_store_connect:
-      #   auth_type: integration
     scripts:
       - name: Install dependencies & CocoaPods
         script: |
@@ -23,9 +19,7 @@ workflows:
           fi
       - name: Set up code signing
         script: |
-          # Codemagicの自動署名（App Store Connect API連携を使用する場合）
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type DEVELOPMENT || true
-          # または自動管理に任せる場合は Xcode の設定を維持
       - name: Build ipa for testing / archiving
         script: |
           cd src
