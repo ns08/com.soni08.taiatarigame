@@ -1,4 +1,4 @@
-name: iOS Build with xcodebuild
+name: iOS Build and Archive
 
 on:
   push:
@@ -11,33 +11,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
       - name: Create API Key File from Secret
         run: |
-          mkdir -p private_keys
-          echo "${{ secrets.ASC_PRIVATE_KEY }}" > private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
-      - name: Archive App
+      - name: Build and Archive (Automatic Signing)
         run: |
-            xcodebuild -workspace YourApp.xcworkspace \
-              -scheme YourAppScheme \
-              -configuration Release \
-              -sdk iphoneos \
-              -archivePath $PWD/build/YourApp.xcarchive \
-              archive \
-              CODE_SIGN_STYLE=Manual \
-              CODE_SIGN_IDENTITY="Apple Distribution" \
-              PROVISIONING_PROFILE_SPECIFIER="JACG2JJ596.jp.soni08.taiatarigame"
-
-      - name: Export Archive (IPA)
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath $PWD/build/YourApp.xcarchive \
-            -exportPath $PWD/build/output \
-            -exportOptionsPlist ios/ExportOptions.plist \
+          cd src
+          xcodebuild -workspace taiatarigame.xcworkspace \
+            -scheme taiatarigame \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            archive \
             -allowProvisioningUpdates \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            -authenticationKeyPath "$PWD/private_keys/AuthKey_$ASC_KEY_ID.p8"
+            CODE_SIGN_STYLE="Automatic" \
+            DEVELOPMENT_TEAM="JACG2JJ596" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
