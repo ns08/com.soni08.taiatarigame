@@ -37,6 +37,13 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
+      - name: Import signing assets
+        uses: apple/actions/import-codesign@v1
+        with:
+          p12-base64: ${{ secrets.P12_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+          mobileprovision-base64: ${{ secrets.MOBILEPROVISION_BASE64 }}
+
       - name: Build and Archive
         run: |
           cd src
