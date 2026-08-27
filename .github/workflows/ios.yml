@@ -43,8 +43,10 @@ jobs:
                      -allowProvisioningUpdates \
                      CODE_SIGN_STYLE="Automatic" \
                      DEVELOPMENT_TEAM="JACG2JJ596" \
-                     -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-                     -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+                     -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" \
+                     -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}" \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8"
+                     
 
       - name: Export IPA
         run: |
