@@ -1,4 +1,4 @@
-name: iOS Build and Archive
+name: iOS Build and Archive (Manual & API Key)
 
 on:
   push:
@@ -32,54 +32,34 @@ jobs:
             pod install
           fi
 
+      - name: Set up temporary Keychain and Import Certificate
+        run: |
+          KEYCHAIN_PASS="temp_password"
+          security create-keychain -p "$KEYCHAIN_PASS" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          echo "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
+          security import cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -A
+          security set-key-partition-list -S apple-tor:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
+
+      - name: Install Provisioning Profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.MOBILEPROVISION_BASE64 }}" | base64 --decode > profile.mobileprovision
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
       - name: Create API Key File from Secret
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
-      - name: Install provisioning profile
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
-          echo "Installed provisioning profile:"
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles || true
-
-      - name: Import signing assets
-        uses: Apple-Actions/import-codesign-certs@v2
-        with:
-          p12-file-base64: ${{ secrets.P12_BASE64 }}
-          p12-password: ${{ secrets.P12_PASSWORD }}
-          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
-
-      - name: Determine CODE_SIGN_IDENTITY
-        run: |
-          CID=$(security find-identity -p codesigning -v | awk -F\" '/Apple Distribution/ {print $2; exit}')
-          if [ -z "$CID" ]; then
-            CID=$(security find-identity -p codesigning -v | awk -F\" '{print $2; exit}')
-          fi
-          echo "Detected CODE_SIGN_IDENTITY: $CID"
-          echo "CODE_SIGN_IDENTITY=$CID" >> $GITHUB_ENV
-
-      - name: Debug workspace contents
+      - name: Build and Archive (Manual Signing)
         run: |
           cd src
-          pwd
-          echo "== ls -la src =="
-          ls -la
-          echo "== ls -la workspace/project =="
-          ls -la taiatarigame.xcworkspace || true
-          ls -la taiatarigame.xcodeproj/xcshareddata/xcschemes || true
-          echo "== xcodebuild -version =="
-          xcodebuild -version
-          echo "== xcodebuild -list =="
-          xcodebuild -list -workspace taiatarigame.xcworkspace || true
-
-      - name: Build and Archive (signed with provisioning profile)
-        run: |
-          set -o pipefail
-          cd src
-          echo "Using CODE_SIGN_IDENTITY=${{ env.CODE_SIGN_IDENTITY }}"
-          # Do not set PROVISIONING_PROFILE / PROVISIONING_PROFILE_SPECIFIER globally (breaks Pods targets).
+          mkdir -p taiatarigame.xcodeproj/xcshareddata/xcschemes/
+          
           xcodebuild -workspace taiatarigame.xcworkspace \
             -scheme taiatarigame \
             -sdk iphoneos \
@@ -89,12 +69,7 @@ jobs:
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
-            2>&1 | tee xcodebuild.log
-        continue-on-error: true
-
-      - name: Upload xcodebuild log
-        uses: actions/upload-artifact@v4
-        with:
-          name: xcodebuild-log
-          path: src/xcodebuild.log
+            PROVISIONING_PROFILE_SPECIFIER="jp.soni08.taiatarigame" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
