@@ -1,13 +1,14 @@
-name: iOS App Store Upload Only
+name: iOS Build and Upload to App Store
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build-and-upload:
     runs-on: macos-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -17,39 +18,44 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
-      - name: Set up Ruby & Bundler
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-
-      - name: Install CocoaPods
+      - name: Install Dependencies (CocoaPods)
         run: |
           cd src
-          if [ -f "Gemfile" ]; then
-            bundle install
-            bundle exec pod install
-          elif [ -f "Podfile" ]; then
+          if [ -f "Podfile" ]; then
             pod install
           fi
 
-      - name: Create API Key File from Secret
+      - name: Set up App Store Connect API Key
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
-      - name: Build and Archive (Automatic Provisioning)
+      - name: Detect Workspace or Project
+        id: detect-build-file
+        run: |
+          cd src
+          if [ "$(ls -A | grep -i '\.xcworkspace$')" ]; then
+            echo "filetype=workspace" >> $GITHUB_OUTPUT
+            echo "filename=$(ls -A | grep -i '\.xcworkspace$')" >> $GITHUB_OUTPUT
+          else
+            echo "filetype=project" >> $GITHUB_OUTPUT
+            echo "filename=$(ls -A | grep -i '\.xcodeproj$')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and Archive
         run: |
           set -o pipefail
           cd src
-          xcodebuild -workspace taiatarigame.xcworkspace \
-            -scheme taiatarigame \
+          scheme_list=$(xcodebuild -list -json | tr -d "\n")
+          scheme=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
+          echo "Using scheme: $scheme"
+
+          xcodebuild -${{ steps.detect-build-file.outputs.filetype }} "${{ steps.detect-build-file.outputs.filename }}" \
+            -scheme "$scheme" \
             -sdk iphoneos \
             -configuration Release \
-            TARGETED_DEVICE_FAMILY="1" \
-            IPHONEOS_DEPLOYMENT_TARGET="15.0" \
-            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Automatic" \
@@ -59,28 +65,19 @@ jobs:
       - name: Export IPA
         run: |
           cd src
+          # exportOptions.plist がない場合は自動生成を想定、またはリポジトリ内に配置してください
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
             -exportOptionsPlist exportOptions.plist \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
             2>&1 | tee export.log
 
-      - name: Upload to App Store Connect (API Key)
+      - name: Upload to App Store Connect
         run: |
           xcrun altool --upload-app \
-            -f "$RUNNER_TEMP/export/taiatarigame.ipa" \
+            -f "$RUNNER_TEMP/export/*.ipa" \
             -t ios \
             --apiKey "${{ secrets.ASC_KEY_ID }}" \
             --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
             --output-format json
-
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            src/xcodebuild.log
-            src/export.log
-          retention-days: 90
