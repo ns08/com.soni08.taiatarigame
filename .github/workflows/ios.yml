@@ -1,8 +1,9 @@
-name: iOS Build and Archive
+name: iOS Build and Archive to App Store
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -31,6 +32,18 @@ jobs:
           elif [ -f "Podfile" ]; then
             pod install
           fi
+
+      - name: Create API Key File from Secret
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
+          chmod 644 ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
 
       - name: Import signing assets
         uses: Apple-Actions/import-codesign-certs@v2
@@ -62,10 +75,50 @@ jobs:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
             CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
+            PROVISIONING_PROFILE_SPECIFIER="appstore_profile" \
             2>&1 | tee xcodebuild.log
 
-      - name: Upload xcodebuild log
+      - name: Export IPA
+        run: |
+          cd src
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            2>&1 | tee export.log
+
+      - name: Upload to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          xcrun altool --validate-app \
+            -f "$RUNNER_TEMP/export/taiatarigame.ipa" \
+            -t ios \
+            -u "${{ secrets.APPLE_ID }}" \
+            -p "${{ secrets.APPLE_APP_PASSWORD }}" \
+            --output-format json
+
+      - name: Upload IPA to App Store
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          xcrun altool --upload-app \
+            -f "$RUNNER_TEMP/export/taiatarigame.ipa" \
+            -t ios \
+            -u "${{ secrets.APPLE_ID }}" \
+            -p "${{ secrets.APPLE_APP_PASSWORD }}" \
+            --output-format json
+
+      - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-log
-          path: src/xcodebuild.log
+          name: build-logs
+          path: |
+            src/xcodebuild.log
+            src/export.log
+          retention-days: 30
