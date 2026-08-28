@@ -1,4 +1,4 @@
-name: iOS Build and Archive to App Store
+name: iOS Build and App Store
 
 on:
   push:
