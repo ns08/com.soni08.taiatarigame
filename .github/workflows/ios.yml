@@ -1,4 +1,4 @@
-name: iOS Build and Archive (Automatic Signing)
+name: iOS Build and Archive (Manual Signing)
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
-      - name: Build and Archive with Automatic Signing
+      - name: Build and Archive with Manual Signing
         run: |
           cd src
           mkdir -p taiatarigame.xcodeproj/xcshareddata/xcschemes/
@@ -49,7 +49,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE="Automatic" \
+            CODE_SIGN_STYLE="Manual" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
             PROVISIONING_PROFILE_SPECIFIER="" \
