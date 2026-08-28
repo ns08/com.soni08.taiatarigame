@@ -1,4 +1,4 @@
-name: iOS Build and Archive to App Store (iOS 15.0 SDK)
+name: iOS Build and Archive to App Store
 
 on:
   push:
@@ -67,7 +67,7 @@ jobs:
           cd src
           xcodebuild -workspace taiatarigame.xcworkspace \
             -scheme taiatarigame \
-            -sdk iphoneos15.0 \
+            -sdk iphoneos \
             -configuration Release \
             IPHONEOS_DEPLOYMENT_TARGET="15.0" \
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
@@ -122,3 +122,4 @@ jobs:
             src/xcodebuild.log
             src/export.log
           retention-days: 30
+
