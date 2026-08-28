@@ -18,71 +18,24 @@ jobs:
         run: |
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          
-          # Base64をデコードして証明書ファイルを作成
-          echo "${{ secrets.BUILD_CERTIFICATE_BASE64 }}" | base64 -d > $CERTIFICATE_PATH
-          
-          # ファイルが正しくデコードされたか確認
-          if [ ! -s $CERTIFICATE_PATH ]; then
-            echo "Error: Certificate file is empty or failed to decode"
-            exit 1
-          fi
-          
-          # ファイル形式を確認
-          file $CERTIFICATE_PATH
-          
-          # キーチェーンを作成
+
+          echo "${{ secrets.BUILD_CERTIFICATE_BASE64 }}" | base64 --decode --output $CERTIFICATE_PATH
+
           security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
           security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
-          
-          # 証明書をインポート（-t cert オプションを削除）
-          security import $CERTIFICATE_PATH -k $KEYCHAIN_PATH -P "${{ secrets.P12_PASSWORD }}" -A
-          
-          # キーチェーンパーティションリストを設定
+
+          security import $CERTIFICATE_PATH -k $KEYCHAIN_PATH -P "${{ secrets.P12_PASSWORD }}" -A -t cert
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
 
       - name: Setup App Store Connect API Key File
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
       - name: Build and Archive iOS Project
         run: |
           cd src
-          
-          # -allowProvisioningUpdates と APIキー情報を渡すことで自動署名が有効になります
-          xcodebuild -workspace pwa-shell.xcworkspace \
-                     -scheme pwa-shell \
-                     -configuration Release \
-                     -archivePath $RUNNER_TEMP/pwa-shell.xcarchive \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-                     -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
-                     -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 \
-                     archive
-
-      - name: Export IPA File
-        run: |
-          cd src
-          xcodebuild -exportArchive \
-                     -archivePath $RUNNER_TEMP/pwa-shell.xcarchive \
-                     -exportOptionsPlist ./exportOptions.plist \
-                     -exportPath $RUNNER_TEMP/build_output \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-                     -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
-                     -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
-
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-app-release
-          path: ${{ runner.temp }}/build_output/*.ipa        run: |
-          cd src
-          
-          # -allowProvisioningUpdates と APIキー情報を渡すことで自動署名が有効になります
           xcodebuild -workspace pwa-shell.xcworkspace \
                      -scheme pwa-shell \
                      -configuration Release \
