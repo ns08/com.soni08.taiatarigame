@@ -54,6 +54,7 @@ jobs:
           xcodebuild -${{ steps.detect-build-file.outputs.filetype }} "${{ steps.detect-build-file.outputs.filename }}" \
             -scheme "$scheme" \
             -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
             -archivePath "$RUNNER_TEMP/app.xcarchive" \
             clean archive \
@@ -63,6 +64,7 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             2>&1 | tee xcodebuild.log
 
       - name: Export IPA
