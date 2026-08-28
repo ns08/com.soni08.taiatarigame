@@ -1,126 +1,65 @@
-name: iOS App Store Upload Only
+name: Build iOS PWA App
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ main ]  # mainブランチにプッシュされた時に実行
+  workflow_dispatch:     # GitHubの画面から手動で実行する用
 
 jobs:
-  build-and-upload:
+  build:
+    name: Build IPA
     runs-on: macos-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Select Latest Xcode Version
+      - name: Install Apple Certificate and Provisioning Profile
         run: |
-          sudo xcode-select -s /Applications/Xcode.app
-          xcodebuild -version
+          # パスの定義
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-      - name: Set up Ruby & Bundler
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
+          # シークレットからBase64をデコードして復元
+          echo "${{ secrets.BUILD_CERTIFICATE_BASE64 }}" | base64 --decode --output $CERTIFICATE_PATH
+          echo "${{ secrets.BUILD_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode --output $PP_PATH
 
-      - name: Install CocoaPods
-        run: |
-          cd src
-          if [ -f "Gemfile" ]; then
-            bundle install
-            bundle exec pod install
-          elif [ -f "Podfile" ]; then
-            pod install
-          fi
+          # 一時的なキーチェーンを作成・設定
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
+          security default-keychain -s $KEYCHAIN_PATH
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
 
-      - name: Create API Key File from Secret
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          # 証明書をキーチェーンにインポート
+          security import $CERTIFICATE_PATH -k $KEYCHAIN_PATH -P "${{ secrets.P12_PASSWORD }}" -A -t cert
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
 
-      - name: Install provisioning profile
-        run: |
+          # プロビジョニングプロファイルをXcodeの指定フォルダに配置
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
-          chmod 644 ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
 
-      - name: Import signing assets
-        uses: Apple-Actions/import-codesign-certs@v2
-        with:
-          p12-file-base64: ${{ secrets.P12_BASE64 }}
-          p12-password: ${{ secrets.P12_PASSWORD }}
-          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
-
-      - name: Determine CODE_SIGN_IDENTITY
+      - name: Build and Archive iOS Project
         run: |
-          CID=$(security find-identity -p codesigning -v | awk -F\" '/Apple Distribution/ {print $2; exit}')
-          if [ -z "$CID" ]; then
-            CID=$(security find-identity -p codesigning -v | awk -F\" '{print $2; exit}')
-          fi
-          echo "Detected CODE_SIGN_IDENTITY: $CID"
-          echo "CODE_SIGN_IDENTITY=$CID" >> $GITHUB_ENV
-
-      - name: Build and Archive (iPhone Only)
-        run: |
-          set -o pipefail
+          # あなたのリポジトリ構造に合わせてsrcフォルダに移動
           cd src
-          xcodebuild -workspace taiatarigame.xcworkspace \
-            -scheme taiatarigame \
-            -sdk iphoneos \
-            -configuration Release \
-            TARGETED_DEVICE_FAMILY="1" \
-            IPHONEOS_DEPLOYMENT_TARGET="18.0" \
-            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
-            clean archive \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE="Manual" \
-            DEVELOPMENT_TEAM="JACG2JJ596" \
-            CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE_SPECIFIER="appstore_profile" \
-            2>&1 | tee xcodebuild.log
+          
+          xcodebuild -workspace pwa-shell.xcworkspace \
+                     -scheme pwa-shell \
+                     -configuration Release \
+                     -archivePath $RUNNER_TEMP/pwa-shell.xcarchive \
+                     archive \
+                     CODE_SIGN_STYLE=Manual
 
-      - name: Export IPA
+      - name: Export IPA File
         run: |
-          cd src
+          # ルート階層にある exportOptions.plist を指定してIPAに書き出し
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
-            -exportOptionsPlist exportOptions.plist \
-            -exportPath "$RUNNER_TEMP/export" \
-            2>&1 | tee export.log
+                     -archivePath $RUNNER_TEMP/pwa-shell.xcarchive \
+                     -exportOptionsPlist ./exportOptions.plist \
+                     -exportPath $RUNNER_TEMP/build_output
 
-      - name: Validate App Store Package
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
-        run: |
-          xcrun altool --validate-app \
-            -f "$RUNNER_TEMP/export/taiatarigame.ipa" \
-            -t ios \
-            -u "${{ secrets.APPLE_ID }}" \
-            -p "${{ secrets.APPLE_APP_PASSWORD }}" \
-            --output-format json
-
-      - name: Upload IPA to App Store
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
-        run: |
-          xcrun altool --upload-app \
-            -f "$RUNNER_TEMP/export/taiatarigame.ipa" \
-            -t ios \
-            -u "${{ secrets.APPLE_ID }}" \
-            -p "${{ secrets.APPLE_APP_PASSWORD }}" \
-            --output-format json
-
-      - name: Upload artifacts
-        if: always()
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
-          path: |
-            src/xcodebuild.log
-            src/export.log
-          retention-days: 90
+          name: ios-app-release
+          path: ${{ runner.temp }}/build_output/*.ipa
