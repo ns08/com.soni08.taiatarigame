@@ -7,15 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-12  # Xcode 11を動かすためにやや古いOSイメージ（例: macOS 12）を指定する必要がある場合があります
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Select Latest Xcode Version
-        run: |
-          sudo xcode-select -s /Applications/Xcode.app
-          xcodebuild -version
+      - name: Select Xcode Version 11
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '11.7'
+
+      - name: Check Xcode Version
+        run: xcodebuild -version
 
       - name: Set up Ruby & Bundler
         uses: ruby/setup-ruby@v1
@@ -121,3 +124,4 @@ jobs:
             src/xcodebuild.log
             src/export.log
           retention-days: 30
+
