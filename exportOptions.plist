@@ -7,15 +7,9 @@
     <key>method</key>
     <string>app-store</string>
     <key>signingStyle</key>
-    <string>manual</string>
+    <string>automatic</string>
     <key>teamID</key>
     <string>JACG2JJ596</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <!-- 下記の2行をご自身のBundle IDと、ステップ1の5番で決めたプロファイル名に合わせます -->
-        <key>com.soni08.taiatarigame</key>
-        <string>com.soni08.taiatarigame</string>
-    </dict>
     <key>compileBitcode</key>
     <false/>
     <key>uploadSymbols</key>
