@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-upload:
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -39,33 +39,7 @@ jobs:
           echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
-      - name: Install provisioning profile
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/com.soni08.taiatarigame.mobileprovision
-          chmod 644 ~/Library/MobileDevice/Provisioning\ Profiles/com.soni08.taiatarigame.mobileprovision
-
-      - name: Import signing assets
-        uses: Apple-Actions/import-codesign-certs@v2
-        with:
-          p12-file-base64: ${{ secrets.P12_BASE64 }}
-          p12-password: ${{ secrets.P12_PASSWORD }}
-          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
-
-      - name: Check Keychain Identities
-        run: |
-          security find-identity -p codesigning -v
-
-      - name: Determine CODE_SIGN_IDENTITY
-        run: |
-          CID=$(security find-identity -p codesigning -v | awk -F\" '/Apple Distribution/ {print $2; exit}')
-          if [ -z "$CID" ]; then
-            CID=$(security find-identity -p codesigning -v | awk -F\" '{print $2; exit}')
-          fi
-          echo "Detected CODE_SIGN_IDENTITY: $CID"
-          echo "CODE_SIGN_IDENTITY=$CID" >> $GITHUB_ENV
-
-      - name: Build and Archive (iPhone Only)
+      - name: Build and Archive (Automatic Provisioning)
         run: |
           set -o pipefail
           cd src
@@ -78,10 +52,8 @@ jobs:
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE_SPECIFIER="com.soni08.taiatarigame" \
             2>&1 | tee xcodebuild.log
 
       - name: Export IPA
