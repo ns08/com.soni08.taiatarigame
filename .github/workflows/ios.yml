@@ -43,6 +43,28 @@ jobs:
             echo "filename=$(ls -A | grep -i '\.xcodeproj$')" >> $GITHUB_OUTPUT
           fi
 
+      - name: Create ExportOptions.plist
+        run: |
+          cd src
+          cat << 'EOF' > exportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>teamID</key>
+              <string>JACG2JJ596</string>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
       - name: Build and Archive for iOS Device
         run: |
           set -o pipefail
@@ -64,7 +86,6 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             2>&1 | tee xcodebuild.log
 
       - name: Export IPA
