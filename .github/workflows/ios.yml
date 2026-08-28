@@ -70,7 +70,7 @@ jobs:
             -sdk iphoneos \
             -configuration Release \
             TARGETED_DEVICE_FAMILY="1" \
-            IPHONEOS_DEPLOYMENT_TARGET="15.0" \
+            IPHONEOS_DEPLOYMENT_TARGET="18.0" \
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
