@@ -1,4 +1,4 @@
-name: iOS Build and Archive (Manual & API Key)
+name: iOS Build and Archive (Auto with Manual Fallback)
 
 on:
   push:
@@ -32,10 +32,36 @@ jobs:
             pod install
           fi
 
-      - name: Set up temporary Keychain and Import Certificate
+      - name: Create API Key File from Secret
         run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+
+      - name: Try Build with Automatic Signing
+        id: auto-build
+        continue-on-error: true
+        run: |
+          cd src
+          mkdir -p taiatarigame.xcodeproj/xcshareddata/xcschemes/
+          
+          xcodebuild -workspace taiatarigame.xcworkspace \
+            -scheme taiatarigame \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            clean archive \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE="Automatic" \
+            DEVELOPMENT_TEAM="JACG2JJ596" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+
+      - name: Set up temporary Keychain and Import Certificate (Fallback)
+        if: steps.auto-build.outcome == 'failure'
+        run: |
+          echo "Automatic signing failed. Falling back to manual signing..."
           KEYCHAIN_PASS="temp_password"
-          # 既存のキーチェーンがあれば削除してクリーンな状態にする
           security default-keychain -s login.keychain
           security delete-keychain build.keychain || true
 
@@ -48,26 +74,18 @@ jobs:
           security import cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -A
           security set-key-partition-list -S apple-tor:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
 
-      - name: Install Provisioning Profile
+      - name: Install Provisioning Profile (Fallback)
+        if: steps.auto-build.outcome == 'failure'
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "${{ secrets.MOBILEPROVISION_BASE64 }}" | base64 --decode > profile.mobileprovision
-          
-          # プロファイルのUUIDを抽出し、正しいファイル名で保存する
           UUID=$(grep -a -A 1 "UUID" profile.mobileprovision | grep -o "[-A-Z0-9]\{36\}" | head -n 1)
-          echo "Installed Provisioning Profile UUID: $UUID"
           cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
 
-      - name: Create API Key File from Secret
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
-
-      - name: Build and Archive (Manual Signing)
+      - name: Build and Archive with Manual Signing (Fallback)
+        if: steps.auto-build.outcome == 'failure'
         run: |
           cd src
-          mkdir -p taiatarigame.xcodeproj/xcshareddata/xcschemes/
-          
           xcodebuild -workspace taiatarigame.xcworkspace \
             -scheme taiatarigame \
             -sdk iphoneos \
