@@ -80,6 +80,7 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "${{ secrets.MOBILEPROVISION_BASE64 }}" | base64 --decode > profile.mobileprovision
           UUID=$(grep -a -A 1 "UUID" profile.mobileprovision | grep -o "[-A-Z0-9]\{36\}" | head -n 1)
+          echo "Extracted Profile UUID: $UUID"
           cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
 
       - name: Build and Archive with Manual Signing (Fallback)
@@ -92,10 +93,6 @@ jobs:
             -configuration Release \
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
-            -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            PROVISIONING_PROFILE_SPECIFIER="jp.soni08.taiatarigame" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+            PROVISIONING_PROFILE_SPECIFIER="com.soni08.taiatarigame"
