@@ -52,6 +52,10 @@ jobs:
           p12-password: ${{ secrets.P12_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      - name: Check Keychain Identities
+        run: |
+          security find-identity -p codesigning -v
+
       - name: Determine CODE_SIGN_IDENTITY
         run: |
           CID=$(security find-identity -p codesigning -v | awk -F\" '/Apple Distribution/ {print $2; exit}')
@@ -74,7 +78,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE="Automatic" \
+            CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
             CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
             2>&1 | tee xcodebuild.log
@@ -86,6 +90,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             -exportOptionsPlist exportOptions.plist \
             -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
             2>&1 | tee export.log
 
       - name: Upload to App Store Connect (API Key)
