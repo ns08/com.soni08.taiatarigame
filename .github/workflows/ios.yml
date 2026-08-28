@@ -1,4 +1,4 @@
-name: Build iOS PWA App (Auto Signing)
+name: iOS App Store Upload Only
 
 on:
   push:
@@ -6,60 +6,103 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build IPA
+  build-and-upload:
     runs-on: macos-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Apple Certificate
+      - name: Select Latest Xcode Version
         run: |
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
 
-          echo "${{ secrets.BUILD_CERTIFICATE_BASE64 }}" | base64 --decode --output $CERTIFICATE_PATH
+      - name: Set up Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
 
-          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
-          security default-keychain -s $KEYCHAIN_PATH
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
-
-          security import $CERTIFICATE_PATH -k $KEYCHAIN_PATH -P "${{ secrets.P12_PASSWORD }}" -A -t cert
-          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" $KEYCHAIN_PATH
-
-      - name: Setup App Store Connect API Key File
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
-
-      - name: Build and Archive iOS Project
+      - name: Install CocoaPods
         run: |
           cd src
-          xcodebuild -workspace pwa-shell.xcworkspace \
-                     -scheme pwa-shell \
-                     -configuration Release \
-                     -archivePath $RUNNER_TEMP/pwa-shell.xcarchive \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-                     -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
-                     -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 \
-                     archive
+          if [ -f "Gemfile" ]; then
+            bundle install
+            bundle exec pod install
+          elif [ -f "Podfile" ]; then
+            pod install
+          fi
 
-      - name: Export IPA File
+      - name: Create API Key File from Secret
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
+          chmod 644 ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
+
+      - name: Import signing assets
+        uses: Apple-Actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.P12_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      - name: Determine CODE_SIGN_IDENTITY
+        run: |
+          CID=$(security find-identity -p codesigning -v | awk -F\" '/Apple Distribution/ {print $2; exit}')
+          if [ -z "$CID" ]; then
+            CID=$(security find-identity -p codesigning -v | awk -F\" '{print $2; exit}')
+          fi
+          echo "Detected CODE_SIGN_IDENTITY: $CID"
+          echo "CODE_SIGN_IDENTITY=$CID" >> $GITHUB_ENV
+
+      - name: Build and Archive (iPhone Only)
+        run: |
+          set -o pipefail
+          cd src
+          xcodebuild -workspace taiatarigame.xcworkspace \
+            -scheme taiatarigame \
+            -sdk iphoneos \
+            -configuration Release \
+            TARGETED_DEVICE_FAMILY="1" \
+            IPHONEOS_DEPLOYMENT_TARGET="15.0" \
+            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            clean archive \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE="Automatic" \
+            DEVELOPMENT_TEAM="JACG2JJ596" \
+            CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
+            2>&1 | tee xcodebuild.log
+
+      - name: Export IPA
         run: |
           cd src
           xcodebuild -exportArchive \
-                     -archivePath $RUNNER_TEMP/pwa-shell.xcarchive \
-                     -exportOptionsPlist ./exportOptions.plist \
-                     -exportPath $RUNNER_TEMP/build_output \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-                     -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
-                     -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+            -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            2>&1 | tee export.log
 
-      - name: Upload IPA Artifact
+      - name: Upload to App Store Connect (API Key)
+        run: |
+          xcrun altool --upload-app \
+            -f "$RUNNER_TEMP/export/taiatarigame.ipa" \
+            -t ios \
+            --apiKey "${{ secrets.ASC_KEY_ID }}" \
+            --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
+            --output-format json
+
+      - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-app-release
-          path: ${{ runner.temp }}/build_output/*.ipa
+          name: build-logs
+          path: |
+            src/xcodebuild.log
+            src/export.log
+          retention-days: 90
