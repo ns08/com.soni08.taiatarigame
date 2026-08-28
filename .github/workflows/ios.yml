@@ -60,6 +60,7 @@ jobs:
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             2>&1 | tee xcodebuild.log
 
       - name: Export IPA
@@ -80,3 +81,12 @@ jobs:
             --apiKey "${{ secrets.ASC_KEY_ID }}" \
             --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
             --output-format json
+
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            src/xcodebuild.log
+            src/export.log
