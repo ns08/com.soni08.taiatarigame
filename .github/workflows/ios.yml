@@ -50,8 +50,9 @@ jobs:
             clean archive \
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE="Automatic" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
-
