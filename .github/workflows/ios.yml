@@ -32,18 +32,6 @@ jobs:
             pod install
           fi
 
-      - name: Create API Key File from Secret
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "${{ secrets.ASC_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
-
-      - name: Install provisioning profile
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/appstore_profile.mobileprovision
-          echo "Installed provisioning profile:"
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles || true
-
       - name: Import signing assets
         uses: Apple-Actions/import-codesign-certs@v2
         with:
@@ -60,26 +48,10 @@ jobs:
           echo "Detected CODE_SIGN_IDENTITY: $CID"
           echo "CODE_SIGN_IDENTITY=$CID" >> $GITHUB_ENV
 
-      - name: Debug workspace contents
-        run: |
-          cd src
-          pwd
-          echo "== ls -la src =="
-          ls -la
-          echo "== ls -la workspace/project =="
-          ls -la taiatarigame.xcworkspace || true
-          ls -la taiatarigame.xcodeproj/xcshareddata/xcschemes || true
-          echo "== xcodebuild -version =="
-          xcodebuild -version
-          echo "== xcodebuild -list =="
-          xcodebuild -list -workspace taiatarigame.xcworkspace || true
-
-      - name: Build and Archive (signed with provisioning profile)
+      - name: Build and Archive
         run: |
           set -o pipefail
           cd src
-          echo "Using CODE_SIGN_IDENTITY=${{ env.CODE_SIGN_IDENTITY }}"
-          # Do not set PROVISIONING_PROFILE / PROVISIONING_PROFILE_SPECIFIER globally (breaks Pods targets).
           xcodebuild -workspace taiatarigame.xcworkspace \
             -scheme taiatarigame \
             -sdk iphoneos \
@@ -91,7 +63,6 @@ jobs:
             DEVELOPMENT_TEAM="JACG2JJ596" \
             CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
             2>&1 | tee xcodebuild.log
-        continue-on-error: true
 
       - name: Upload xcodebuild log
         uses: actions/upload-artifact@v4
