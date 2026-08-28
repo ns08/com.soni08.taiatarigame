@@ -35,6 +35,10 @@ jobs:
       - name: Set up temporary Keychain and Import Certificate
         run: |
           KEYCHAIN_PASS="temp_password"
+          # 既存のキーチェーンがあれば削除してクリーンな状態にする
+          security default-keychain -s login.keychain
+          security delete-keychain build.keychain || true
+
           security create-keychain -p "$KEYCHAIN_PASS" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
@@ -48,7 +52,11 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "${{ secrets.MOBILEPROVISION_BASE64 }}" | base64 --decode > profile.mobileprovision
-          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+          # プロファイルのUUIDを抽出し、正しいファイル名で保存する
+          UUID=$(grep -a -A 1 "UUID" profile.mobileprovision | grep -o "[-A-Z0-9]\{36\}" | head -n 1)
+          echo "Installed Provisioning Profile UUID: $UUID"
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
 
       - name: Create API Key File from Secret
         run: |
