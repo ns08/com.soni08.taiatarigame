@@ -74,7 +74,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/taiatarigame.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE="Automatic" \
+            CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
             CODE_SIGN_IDENTITY="${{ env.CODE_SIGN_IDENTITY }}" \
             2>&1 | tee xcodebuild.log
