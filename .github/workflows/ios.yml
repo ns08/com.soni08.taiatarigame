@@ -58,9 +58,11 @@ jobs:
             -archivePath "$RUNNER_TEMP/app.xcarchive" \
             clean archive \
             -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="JACG2JJ596" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             2>&1 | tee xcodebuild.log
 
       - name: Export IPA
@@ -71,6 +73,9 @@ jobs:
             -exportOptionsPlist exportOptions.plist \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             2>&1 | tee export.log
 
       - name: Upload to App Store Connect
