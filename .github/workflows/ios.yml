@@ -62,17 +62,31 @@ jobs:
         run: |
           echo "Automatic signing failed. Falling back to manual signing..."
           KEYCHAIN_PASS="temp_password"
-          security default-keychain -s login.keychain
+          
+          # Clean up any existing build keychain
           security delete-keychain build.keychain || true
-
+          
+          # Create keychain first
           security create-keychain -p "$KEYCHAIN_PASS" build.keychain
+          
+          # Set as default keychain
           security default-keychain -s build.keychain
+          
+          # Unlock keychain
           security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
+          
+          # Set keychain settings
           security set-keychain-settings -t 3600 -u build.keychain
 
+          # Decode and import certificate
           echo "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
           security import cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -A
+          
+          # Set partition list
           security set-key-partition-list -S apple-tor:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
+          
+          # Clean up certificate file
+          rm -f cert.p12
 
       - name: Install Provisioning Profile (Fallback)
         if: steps.auto-build.outcome == 'failure'
@@ -82,6 +96,9 @@ jobs:
           UUID=$(grep -a -A 1 "UUID" profile.mobileprovision | grep -o "[-A-Z0-9]\{36\}" | head -n 1)
           echo "Extracted Profile UUID: $UUID"
           cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          
+          # Clean up profile file
+          rm -f profile.mobileprovision
 
       - name: Build and Archive with Manual Signing (Fallback)
         if: steps.auto-build.outcome == 'failure'
