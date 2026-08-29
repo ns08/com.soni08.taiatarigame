@@ -1,21 +1,20 @@
-name: Build iOS App (TaiatariGame)
+name: Deploy to TestFlight
 
 on:
   push:
     branches:
       - main
-      - master
 
 jobs:
-  build:
-    name: Build and Sign iOS App
+  deploy:
+    name: Build, Sign and Upload to TestFlight
     runs-on: macos-14
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 一時的なキーチェーンを作成
+      # 1. 一時的なキーチェーンの作成
       - name: Set up keychain
         run: |
           keychain_path=$RUNNER_TEMP/app-signing.keychain-db
@@ -24,7 +23,7 @@ jobs:
           security unlock-keychain -p "" "$keychain_path"
           echo "KEYCHAIN_PATH=$keychain_path" >> $GITHUB_ENV
 
-      # 2. GitHub Secretsから証明書を復元してインポート
+      # 2. 証明書（.p12）のインポート
       - name: Import Certificate
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -33,24 +32,22 @@ jobs:
         run: |
           cert_path=$RUNNER_TEMP/build_certificate.p12
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$cert_path"
-
           security import "$cert_path" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-todo:,apple: -s -k "" "$KEYCHAIN_PATH"
 
-      # 3. プロビジョニングプロファイルをインストール
+      # 3. プロビジョニングプロファイルのインストール
       - name: Import Provisioning Profile
         env:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
         run: |
           profile_path=$RUNNER_TEMP/build_profile.mobileprovision
           echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$profile_path"
-
           uuid=$(grep -a -A 1 '<key>UUID</key>' "$profile_path" | tail -n 1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
 
-      # 4. 手動署名（Manual）を指定したXcodeビルドの実行
-      - name: Build Xcode Project
+      # 4. Xcodeプロジェクトのアーカイブ作成（手動署名）
+      - name: Build and Archive
         run: |
           xcodebuild -project src/taiatarigame.xcodeproj \
                      -scheme taiatarigame \
@@ -62,3 +59,20 @@ jobs:
                      CODE_SIGN_IDENTITY="Apple Distribution" \
                      PROVISIONING_PROFILE_SPECIFIER="com.soni08.taiatarigame" \
                      DEVELOPMENT_TEAM="JACG2JJ596"
+
+      # 5. .ipaファイルの書き出し
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+                     -archivePath $RUNNER_TEMP/taiatarigame.xcarchive \
+                     -exportPath $RUNNER_TEMP/output \
+                     -exportOptionsPlist ExportOptions.plist
+
+      # 6. TestFlightへ自動アップロード
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v5
+        with:
+          app-path: ${{ runner.temp }}/output/taiatarigame.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
