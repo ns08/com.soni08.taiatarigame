@@ -49,26 +49,16 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
 
-      # 4. Xcodeビルドの実行（プロジェクトの構成に合わせて調整してください）
+      # 4. 手動署名（Manual）を指定したXcodeビルドの実行
       - name: Build Xcode Project
         run: |
-          # .xcworkspace または .xcodeproj の指定に合わせて書き換えてください
-          if [ -d "*.xcworkspace" ]; then
-            xcodebuild -workspace *.xcworkspace \
-                       -scheme taiatarigame \
-                       -sdk iphoneos \
-                       -configuration Release \
-                       archive \
-                       -archivePath $RUNNER_TEMP/taiatarigame.xcarchive \
-                       CODE_SIGN_STYLE=Manual \
-                       DEVELOPMENT_TEAM="JACG2JJ596"
-          else
-            xcodebuild -project *.xcodeproj \
-                       -scheme taiatarigame \
-                       -sdk iphoneos \
-                       -configuration Release \
-                       archive \
-                       -archivePath $RUNNER_TEMP/taiatarigame.xcarchive \
-                       CODE_SIGN_STYLE=Manual \
-                       DEVELOPMENT_TEAM="JACG2JJ596"
-          fi
+          xcodebuild -project src/taiatarigame.xcodeproj \
+                     -scheme taiatarigame \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     archive \
+                     -archivePath $RUNNER_TEMP/taiatarigame.xcarchive \
+                     CODE_SIGN_STYLE=Manual \
+                     CODE_SIGN_IDENTITY="Apple Distribution" \
+                     PROVISIONING_PROFILE_SPECIFIER="com.soni08.taiatarigame" \
+                     DEVELOPMENT_TEAM="JACG2JJ596"
