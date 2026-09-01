@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "taiatarigame",
+    "slug": "taiatarigame",
+    "version": "1.0.0",
+    "platforms": [
+      "ios"
+    ],
+    "ios": {
+      "bundleIdentifier": "jp.soni08.taiatarigame"
+    }
+  }
+}
