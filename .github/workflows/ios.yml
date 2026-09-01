@@ -1,0 +1,73 @@
+name: Build and Deploy to TestFlight
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. キーチェーンの設定
+      - name: Set up keychain
+        run: |
+          keychain_path=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "" "$keychain_path"
+          echo "KEYCHAIN_PATH=$keychain_path" >> $GITHUB_ENV
+
+      # 2. .p12 証明書のインポート
+      - name: Import Certificate
+        env:
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PATH: ${{ env.KEYCHAIN_PATH }}
+        run: |
+          cert_path="certs/certificate.p12"
+          security import "$cert_path" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-todo:,apple: -s -k "" "$KEYCHAIN_PATH"
+
+      # 3. プロビジョニングプロファイルの配置
+      - name: Import Provisioning Profile
+        run: |
+          profile_path="certs/build_profile.mobileprovision"
+          uuid=$(grep -a -A 1 '<key>UUID</key>' "$profile_path" | tail -n 1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
+
+      # 4. アーカイブ作成
+      - name: Build Archive
+        run: |
+          xcodebuild -project src/taiatarigame.xcodeproj \
+                     -scheme taiatarigame \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     archive \
+                     -archivePath $RUNNER_TEMP/taiatarigame.xcarchive \
+                     PRODUCT_BUNDLE_IDENTIFIER="jp.soni08.taiatarigame" \
+                     CODE_SIGN_STYLE=Manual \
+                     CODE_SIGN_IDENTITY="Apple Distribution" \
+                     PROVISIONING_PROFILE_SPECIFIER="ios" \
+                     DEVELOPMENT_TEAM="JACG2JJ596"
+
+      # 5. .ipa の書き出し
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+                     -archivePath $RUNNER_TEMP/taiatarigame.xcarchive \
+                     -exportPath $RUNNER_TEMP/output \
+                     -exportOptionsPlist ExportOptions.plist
+
+      # 6. TestFlightへのアップロード
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v5
+        with:
+          app-path: ${{ runner.temp }}/output/taiatarigame.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
