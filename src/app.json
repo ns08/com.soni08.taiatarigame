@@ -8,6 +8,11 @@
     ],
     "ios": {
       "bundleIdentifier": "jp.soni08.taiatarigame"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "19fbfa29-ca6b-4a60-8b0f-054b860e96e6"
+      }
     }
   }
 }
