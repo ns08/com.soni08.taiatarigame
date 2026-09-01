@@ -12,8 +12,8 @@
     <string>Apple Distribution</string>
     <key>provisioningProfiles</key>
     <dict>
-        <key>com.soni08.taiatarigame</key>
-        <string>com.soni08.taiatarigame</string>
+        <key>jp.soni08.taiatarigame</key>
+        <string>ios</string>
     </dict>
     <key>uploadBitcode</key>
     <false/>
