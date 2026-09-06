@@ -1,7 +1,7 @@
 workflows:
   ios-app-store-build:
     name: iOS App Store Build
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       ios_signing:
@@ -10,6 +10,14 @@ workflows:
       node: 20
       xcode: latest
       cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: true
+      cancel_previous_builds: true
     scripts:
       - name: Install dependencies
         script: |
@@ -30,6 +38,6 @@ workflows:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: false
+      email:
+        recipients:
+          - soni0844@gmail.com
