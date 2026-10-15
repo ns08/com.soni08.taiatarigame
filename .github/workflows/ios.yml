@@ -15,10 +15,11 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. App Store Connect APIキーの配置
+      # 画面にある「APP_STORE_CONNECT_API_PRIVATE_KEY」を使用します
       - name: Setup App Store Connect API Key
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          echo "${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
       # 3. CocoaPodsの依存関係インストール
       - name: Install Pods
@@ -27,11 +28,11 @@ jobs:
         working-directory: ./src
 
       # 4. Xcodeアーカイブの作成（ビルド実行）
-      # 環境変数（env）を使って引数を安全にマッピングさせます
+      # 画面にある「ASC_KEY_ID」と「ASC_ISSUER_ID」を正確にマッピングします
       - name: Build Xcode Archive
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcodebuild -workspace src/taiatarigame.xcworkspace \
                      -scheme taiatarigame \
@@ -46,8 +47,8 @@ jobs:
       # 5. IPAファイルの書き出し（パッケージ化）
       - name: Export IPA
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcodebuild -exportArchive \
                      -archivePath build/App.xcarchive \
@@ -61,8 +62,8 @@ jobs:
       # 6. TestFlight (App Store Connect) へアップロード
       - name: Upload to TestFlight
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcrun altool --upload-app \
                        --type ios \
