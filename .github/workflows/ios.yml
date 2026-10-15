@@ -27,12 +27,17 @@ jobs:
         working-directory: ./src
 
       # 4. Xcodeアーカイブの作成（ビルド実行）
-      # 引数の末尾に「CODE_SIGN_STYLE」と「DEVELOPMENT_TEAM」を追加して強制自動生成させます
+      # ビルド前に、プロジェクト設定ファイル内のチームID（空白部分）を直接上書き置換します
       - name: Build Xcode Archive
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: "あなたのチームID（10桁の英数字）" # ここにご自身のチームIDを入力してください
         run: |
+          # プロジェクトファイル内の DevelopmentTeam 設定を直接書き換える（力技での上書き）
+          sed -i '' "s/DevelopmentTeam = \"\";/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
+          sed -i '' "s/DevelopmentTeam = .*/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
+
           xcodebuild -workspace src/taiatarigame.xcworkspace \
                      -scheme taiatarigame \
                      -destination 'generic/platform=iOS' \
@@ -43,14 +48,14 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+                     DEVELOPMENT_TEAM="$TEAM_ID"
 
       # 5. IPAファイルの書き出し（パッケージ化）
-      # こちらも同様に末尾の2行を追加して上書きします
       - name: Export IPA
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: "JACG2JJ596" # ここにもご自身のチームIDを入力してください
         run: |
           xcodebuild -exportArchive \
                      -archivePath build/App.xcarchive \
@@ -61,7 +66,7 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+                     DEVELOPMENT_TEAM="$TEAM_ID"
 
       # 6. TestFlight (App Store Connect) へアップロード
       - name: Upload to TestFlight
