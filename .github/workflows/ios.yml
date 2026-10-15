@@ -27,14 +27,13 @@ jobs:
         working-directory: ./src
 
       # 4. Xcodeアーカイブの作成（ビルド実行）
-      # ビルド前に、プロジェクト設定ファイル内のチームID（空白部分）を直接上書き置換します
+      # IPHONEOS_DEPLOYMENT_TARGET=15.0 を指定してiOS 15以降に完全対応させます
       - name: Build Xcode Archive
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          TEAM_ID: "JACG2JJ596" # ここにご自身のチームIDを入力してください
+          TEAM_ID: "JACG2JJ596"
         run: |
-          # プロジェクトファイル内の DevelopmentTeam 設定を直接書き換える（力技での上書き）
           sed -i '' "s/DevelopmentTeam = \"\";/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
           sed -i '' "s/DevelopmentTeam = .*/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
 
@@ -48,14 +47,38 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="$TEAM_ID"
+                     DEVELOPMENT_TEAM="$TEAM_ID" \
+                     IPHONEOS_DEPLOYMENT_TARGET=15.0
 
-      # 5. IPAファイルの書き出し（パッケージ化）
+      # 5. 自動署名用の ExportOptions.plist を新規作成
+      - name: Generate ExportOptions.plist
+        run: |
+          cat <<EOF > src/exportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+          <plist version="1.0">
+          <dict>
+              <key>destination</key>
+              <string>export</string>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>JACG2JJ596</string>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+      # 6. IPAファイルの書き出し（パッケージ化）
+      # ここでも deployment target を15.0に揃えます
       - name: Export IPA
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          TEAM_ID: "JACG2JJ596" # ここにもご自身のチームIDを入力してください
+          TEAM_ID: "JACG2JJ596"
         run: |
           xcodebuild -exportArchive \
                      -archivePath build/App.xcarchive \
@@ -66,9 +89,10 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="$TEAM_ID"
+                     DEVELOPMENT_TEAM="$TEAM_ID" \
+                     IPHONEOS_DEPLOYMENT_TARGET=15.0
 
-      # 6. TestFlight (App Store Connect) へアップロード
+      # 7. TestFlight (App Store Connect) へアップロード
       - name: Upload to TestFlight
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
