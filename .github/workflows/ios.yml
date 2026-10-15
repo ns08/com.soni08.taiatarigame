@@ -14,49 +14,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Node.js環境のセットアップ
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './src/package-lock.json' # src内のロックファイルを監視
-
-      # 3. 依存パッケージのインストール
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./src
-
-      # 4. Webアプリ（PWA）のビルド
-      # package.jsonのscriptsにある通常のWebビルドコマンドを実行させます
-      - name: Build Web App
-        run: npm run build
-        working-directory: ./src
-        continue-on-error: true # もし純粋なHTML/JSのみでbuildコマンドがない場合はスキップするため
-
-      # 5. Capacitorの同期（iOSネイティブコードの生成）
-      - name: Capacitor Sync
-        run: npx cap sync ios
-        working-directory: ./src
-
-      # 6. App Store Connect APIキーの配置
+      # 2. App Store Connect APIキーの配置
       - name: Setup App Store Connect API Key
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
-      # 7. CocoaPodsの依存関係インストール
+      # 3. CocoaPodsの依存関係インストール
+      # srcフォルダ内のPodfileを元にセットアップを実行します
       - name: Install Pods
         run: |
-          cd ios/App
           pod install
         working-directory: ./src
 
-      # 8. Xcodeアーカイブの作成（ビルド実行）
+      # 4. Xcodeアーカイブの作成（ビルド実行）
+      # srcフォルダ内のワークスペースと英字のスキーム名を指定します
       - name: Build Xcode Archive
         run: |
-          xcodebuild -workspace src/ios/App/App.xcworkspace \
-                     -scheme App \
+          xcodebuild -workspace src/taiatarigame.xcworkspace \
+                     -scheme taiatarigame \
                      -destination 'generic/platform=iOS' \
                      -archivePath build/App.xcarchive \
                      archive \
@@ -65,7 +41,8 @@ jobs:
                      -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
                      -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
-      # 9. IPAファイルの書き出し（リポジトリ内の exportOptions.plist を使用）
+      # 5. IPAファイルの書き出し（パッケージ化）
+      # srcフォルダ内にある既存の exportOptions.plist を指定します
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
@@ -77,11 +54,11 @@ jobs:
                      -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
                      -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
-      # 10. TestFlight (App Store Connect) へアップロード
+      # 6. TestFlight (App Store Connect) へアップロード
       - name: Upload to TestFlight
         run: |
           xcrun altool --upload-app \
                        --type ios \
-                       --file build/exported/App.ipa \
+                       --file build/exported/taiatarigame.ipa \
                        --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
                        --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
