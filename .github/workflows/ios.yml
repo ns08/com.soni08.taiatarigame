@@ -27,8 +27,11 @@ jobs:
         working-directory: ./src
 
       # 4. Xcodeアーカイブの作成（ビルド実行）
-      # オプションのハイフンと大文字・小文字を厳密に修正しました
+      # 環境変数（env）を使って引数を安全にマッピングさせます
       - name: Build Xcode Archive
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcodebuild -workspace src/taiatarigame.xcworkspace \
                      -scheme taiatarigame \
@@ -36,27 +39,33 @@ jobs:
                      -archivePath build/App.xcarchive \
                      archive \
                      -allowProvisioningUpdates \
-                     -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-                     -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
-                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
+                     -authenticationKeyID $KEY_ID \
+                     -authenticationKeyIssuerID $ISSUER_ID \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
 
       # 5. IPAファイルの書き出し（パッケージ化）
       - name: Export IPA
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcodebuild -exportArchive \
                      -archivePath build/App.xcarchive \
                      -exportPath build/exported \
                      -exportOptionsPlist src/exportOptions.plist \
                      -allowProvisioningUpdates \
-                     -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-                     -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
-                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
+                     -authenticationKeyID $KEY_ID \
+                     -authenticationKeyIssuerID $ISSUER_ID \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
 
       # 6. TestFlight (App Store Connect) へアップロード
       - name: Upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcrun altool --upload-app \
                        --type ios \
                        --file build/exported/taiatarigame.ipa \
-                       --apiKey "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-                       --apiIssuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+                       --apiKey $KEY_ID \
+                       --apiIssuer $ISSUER_ID
