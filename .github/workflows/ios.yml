@@ -26,17 +26,34 @@ jobs:
           pod install
         working-directory: ./src
 
-      # 4. Xcodeアーカイブの作成（ビルド実行）
-      # PRODUCT_BUNDLE_IDENTIFIER を追加して正しいID（jp.soni08...）に上書きします
+      # 4. 内部設定（Info.plist / プロジェクトファイル）の自動修正
+      # バージョンアップ、画面向きの追加、衝突を避けるためのID個別書き換えを行います
+      - name: Fix App Metadata and Settings
+        run: |
+          # ターゲットチームIDの設定
+          sed -i '' "s/DevelopmentTeam = \"\";/DevelopmentTeam = JACG2JJ596;/g" src/taiatarigame.xcodeproj/project.pbxproj
+          sed -i '' "s/DevelopmentTeam = .*/DevelopmentTeam = JACG2JJ596;/g" src/taiatarigame.xcodeproj/project.pbxproj
+          
+          # メインアプリのバンドルIDのみを確実に置換（衝突回避）
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = jp.soni08.taiatarigame;/g" src/taiatarigame.xcodeproj/project.pbxproj
+
+          # 各種plistファイルのパスを設定
+          INFO_PLIST="src/taiatarigame/Info.plist"
+
+          # 1. バージョン情報を 1.0.1、ビルド番号をGitHubのアクション実行番号（重複回避）に更新
+          plutil -replace CFBundleShortVersionString -string "1.0.1" "$INFO_PLIST"
+          plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$INFO_PLIST"
+
+          # 2. iPadマルチタスク用の画面の向き（4方向）を強制追加
+          plutil -replace UISupportedInterfaceOrientations -xml "<array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>" "$INFO_PLIST"
+          plutil -replace UISupportedInterfaceOrientations~ipad -xml "<array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>" "$INFO_PLIST"
+
+      # 5. Xcodeアーカイブの作成（ビルド実行）
       - name: Build Xcode Archive
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          TEAM_ID: "JACG2JJ596"
         run: |
-          sed -i '' "s/DevelopmentTeam = \"\";/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
-          sed -i '' "s/DevelopmentTeam = .*/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
-
           xcodebuild -workspace src/taiatarigame.xcworkspace \
                      -scheme taiatarigame \
                      -destination 'generic/platform=iOS' \
@@ -47,11 +64,9 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="$TEAM_ID" \
-                     IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-                     PRODUCT_BUNDLE_IDENTIFIER="jp.soni08.taiatarigame"
+                     IPHONEOS_DEPLOYMENT_TARGET=15.0
 
-      # 5. 自動署名用の ExportOptions.plist を新規作成
+      # 6. 自動署名用の ExportOptions.plist を新規作成
       - name: Generate ExportOptions.plist
         run: |
           cat <<EOF > src/exportOptions.plist
@@ -73,13 +88,11 @@ jobs:
           </plist>
           EOF
 
-      # 6. IPAファイルの書き出し（パッケージ化）
-      # パッケージ化の際にも正しいID（jp.soni08...）を明示します
+      # 7. IPAファイルの書き出し（パッケージ化）
       - name: Export IPA
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          TEAM_ID: "JACG2JJ596"
         run: |
           xcodebuild -exportArchive \
                      -archivePath build/App.xcarchive \
@@ -90,11 +103,9 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
-                     DEVELOPMENT_TEAM="$TEAM_ID" \
-                     IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-                     PRODUCT_BUNDLE_IDENTIFIER="jp.soni08.taiatarigame"
+                     IPHONEOS_DEPLOYMENT_TARGET=15.0
 
-      # 7. TestFlight (App Store Connect) へアップロード
+      # 8. TestFlight (App Store Connect) へアップロード
       - name: Upload to TestFlight
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
