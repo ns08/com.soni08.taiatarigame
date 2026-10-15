@@ -32,7 +32,7 @@ jobs:
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          TEAM_ID: "あなたのチームID（10桁の英数字）" # ここにご自身のチームIDを入力してください
+          TEAM_ID: "JACG2JJ596" # ここにご自身のチームIDを入力してください
         run: |
           # プロジェクトファイル内の DevelopmentTeam 設定を直接書き換える（力技での上書き）
           sed -i '' "s/DevelopmentTeam = \"\";/DevelopmentTeam = ${TEAM_ID};/g" src/taiatarigame.xcodeproj/project.pbxproj
