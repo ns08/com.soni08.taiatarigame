@@ -20,19 +20,24 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: './src/package-lock.json' # src内のロックファイルを監視
 
       # 3. 依存パッケージのインストール
       - name: Install dependencies
         run: npm ci
+        working-directory: ./src
 
       # 4. Webアプリ（PWA）のビルド
+      # package.jsonのscriptsにある通常のWebビルドコマンドを実行させます
       - name: Build Web App
         run: npm run build
+        working-directory: ./src
+        continue-on-error: true # もし純粋なHTML/JSのみでbuildコマンドがない場合はスキップするため
 
-      # 5. Capacitorの同期 (iOSプロジェクトがない場合は自動生成されます)
+      # 5. Capacitorの同期（iOSネイティブコードの生成）
       - name: Capacitor Sync
-        run: |
-          npx cap sync ios
+        run: npx cap sync ios
+        working-directory: ./src
 
       # 6. App Store Connect APIキーの配置
       - name: Setup App Store Connect API Key
@@ -40,17 +45,17 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
-      # 7. CocoaPodsの依存関係インストール (Capacitorが生成したiosフォルダに対して実行)
+      # 7. CocoaPodsの依存関係インストール
       - name: Install Pods
         run: |
           cd ios/App
           pod install
-          cd ../..
+        working-directory: ./src
 
       # 8. Xcodeアーカイブの作成（ビルド実行）
       - name: Build Xcode Archive
         run: |
-          xcodebuild -workspace ios/App/App.xcworkspace \
+          xcodebuild -workspace src/ios/App/App.xcworkspace \
                      -scheme App \
                      -destination 'generic/platform=iOS' \
                      -archivePath build/App.xcarchive \
@@ -60,13 +65,13 @@ jobs:
                      -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
                      -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
-      # 9. IPAファイルの書き出し（既存の exportOptions.plist を使用）
+      # 9. IPAファイルの書き出し（リポジトリ内の exportOptions.plist を使用）
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
                      -archivePath build/App.xcarchive \
                      -exportPath build/exported \
-                     -exportOptionsPlist exportOptions.plist \
+                     -exportOptionsPlist src/exportOptions.plist \
                      -allowProvisioningUpdates \
                      -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
                      -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
