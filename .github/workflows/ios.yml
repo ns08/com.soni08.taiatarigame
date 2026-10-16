@@ -27,12 +27,12 @@ jobs:
         working-directory: ./src
 
       # 4. 内部設定（Info.plist / プロジェクトファイル）の自動修正
-      # 全ての設定（チームID、バンドルID、画面向き、暗号化不要宣言）をここで一網打尽にします
+      # あらゆる記述形式の DevelopmentTeam を根こそぎあなたのチームIDへ書き換えます
       - name: Fix App Metadata and Settings
         run: |
-          # プロジェクトファイル内のチームID（空白部分）を強制的に書き換え
-          sed -i '' 's/DevelopmentTeam = "";/DevelopmentTeam = JACG2JJ596;/g' src/taiatarigame.xcodeproj/project.pbxproj
-          sed -i '' 's/DevelopmentTeam = .*/DevelopmentTeam = JACG2JJ596;/g' src/taiatarigame.xcodeproj/project.pbxproj
+          # プロジェクトファイル内の全ての DevelopmentTeam 指定を漏れなく置換
+          sed -i '' 's/DevelopmentTeam = [^;]*;/DevelopmentTeam = JACG2JJ596;/g' src/taiatarigame.xcodeproj/project.pbxproj
+          sed -i '' 's/DevelopmentTeam_Type = [^;]*;/DevelopmentTeam_Type = AppleID;/g' src/taiatarigame.xcodeproj/project.pbxproj
           
           # メインアプリのバンドルIDを確実に上書き（衝突回避）
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = jp.soni08.taiatarigame;/g' src/taiatarigame.xcodeproj/project.pbxproj
@@ -66,6 +66,7 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
+                     DEVELOPMENT_TEAM="JACG2JJ596" \
                      IPHONEOS_DEPLOYMENT_TARGET=15.0
 
       # 6. 自動署名用の ExportOptions.plist を新規作成
@@ -105,6 +106,7 @@ jobs:
                      -authenticationKeyIssuerID $ISSUER_ID \
                      -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
                      CODE_SIGN_STYLE="Automatic" \
+                     DEVELOPMENT_TEAM="JACG2JJ596" \
                      IPHONEOS_DEPLOYMENT_TARGET=15.0
 
       # 8. TestFlight (App Store Connect) へアップロード
