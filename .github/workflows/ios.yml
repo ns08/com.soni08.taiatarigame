@@ -26,7 +26,7 @@ jobs:
           pod install
         working-directory: ./src
 
-      # 4. 内部設定（Info.plist / プロジェクトファイル）の自動修正
+      # 4. 内部設定（Info.plist / プロジェクトファイル / Swiftコード）の自動修正
       - name: Fix App Metadata and Settings
         working-directory: ./src
         run: |
@@ -49,6 +49,9 @@ jobs:
 
           # 3. 輸出コンプライアンス（暗号化書類の質問）を自動スキップ
           plutil -replace ITSAppUsesNonExemptEncryption -bool false "$INFO_PLIST"
+
+          # 4. Swiftコード内の日本語識別子「体当たりゲーム.webView」をコンパイル可能な「ViewController.webView」に一括置換
+          find 体当たりゲーム -name "*.swift" -type f -exec sed -i '' 's/体当たりゲーム\.webView/ViewController.webView/g' {} +
 
       # 5. Xcodeアーカイブの作成（ビルド実行）
       - name: Build Xcode Archive
