@@ -27,19 +27,19 @@ jobs:
         working-directory: ./src
 
       # 4. 内部設定（Info.plist / プロジェクトファイル）の自動修正
-      # あらゆる記述形式の DevelopmentTeam を根こそぎあなたのチームIDへ書き換えます
       - name: Fix App Metadata and Settings
+        working-directory: ./src
         run: |
-          # プロジェクトファイル内の全ての DevelopmentTeam 指定を漏れなく置換
-          sed -i '' 's/DevelopmentTeam = [^;]*;/DevelopmentTeam = JACG2JJ596;/g' src/taiatarigame.xcodeproj/project.pbxproj
-          sed -i '' 's/DevelopmentTeam_Type = [^;]*;/DevelopmentTeam_Type = AppleID;/g' src/taiatarigame.xcodeproj/project.pbxproj
+          # プロジェクトファイル内の全ての DevelopmentTeam 指定を置換
+          sed -i '' 's/DevelopmentTeam = [^;]*;/DevelopmentTeam = JACG2JJ596;/g' 体当たりゲーム.xcodeproj/project.pbxproj
+          sed -i '' 's/DevelopmentTeam_Type = [^;]*;/DevelopmentTeam_Type = AppleID;/g' 体当たりゲーム.xcodeproj/project.pbxproj
           
           # メインアプリのバンドルIDを確実に上書き（衝突回避）
-          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = jp.soni08.taiatarigame;/g' src/taiatarigame.xcodeproj/project.pbxproj
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = jp.soni08.taiatarigame;/g' 体当たりゲーム.xcodeproj/project.pbxproj
 
-          INFO_PLIST="src/taiatarigame/Info.plist"
+          INFO_PLIST="体当たりゲーム/Info.plist"
 
-          # 1. バージョン情報を 1.0.1、ビルド番号をGitHubの実行番号に更新（重複回避）
+          # 1. バージョン情報を 1.0.1、ビルド番号をGitHubの実行番号に更新
           plutil -replace CFBundleShortVersionString -string "1.0.1" "$INFO_PLIST"
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$INFO_PLIST"
 
@@ -47,7 +47,7 @@ jobs:
           plutil -replace UISupportedInterfaceOrientations -xml "<array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>" "$INFO_PLIST"
           plutil -replace UISupportedInterfaceOrientations~ipad -xml "<array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>" "$INFO_PLIST"
 
-          # 3. 輸出コンプライアンス（暗号化書類の質問）を次回から完全に自動スキップさせる宣言
+          # 3. 輸出コンプライアンス（暗号化書類の質問）を自動スキップ
           plutil -replace ITSAppUsesNonExemptEncryption -bool false "$INFO_PLIST"
 
       # 5. Xcodeアーカイブの作成（ビルド実行）
@@ -56,8 +56,8 @@ jobs:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
-          xcodebuild -workspace src/taiatarigame.xcworkspace \
-                     -scheme taiatarigame \
+          xcodebuild -workspace src/体当たりゲーム.xcworkspace \
+                     -scheme 体当たりゲーム \
                      -destination 'generic/platform=iOS' \
                      -archivePath build/App.xcarchive \
                      archive \
@@ -117,6 +117,6 @@ jobs:
         run: |
           xcrun altool --upload-app \
                        --type ios \
-                       --file build/exported/taiatarigame.ipa \
+                       --file build/exported/体当たりゲーム.ipa \
                        --apiKey $KEY_ID \
                        --apiIssuer $ISSUER_ID
